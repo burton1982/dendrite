@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
+	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 	"github.com/matrix-org/dendrite/federationsender/types"
 )
 
@@ -39,6 +40,16 @@ func NewDatabase(dataSourceName string) (Database, error) {
 	switch uri.Scheme {
 	case "postgres":
 		return postgres.NewDatabase(dataSourceName)
+
+	case "file":
+		if uri.Opaque != "" { // file:filename.db
+			return sqlite3.NewDatabase(uri.Opaque)
+		}
+		if uri.Path != "" { // file:///path/to/filename.db
+			return sqlite3.NewDatabase(uri.Path)
+		}
+		return nil, errors.New("unknown sqlite3 path")
+
 	default:
 		return nil, errors.New("unknown schema")
 	}

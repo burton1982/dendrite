@@ -1,19 +1,4 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package postgres
+package shared
 
 import (
 	"context"
@@ -23,39 +8,28 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/types"
 )
 
-// Database stores information needed by the federation sender
 type Database struct {
-	joinedHostsStatements
-	roomStatements
+	JoinedHostsTable
+	RoomTable
 	common.PartitionOffsetStatements
 	db *sql.DB
 }
 
-// NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (*Database, error) {
-	var result Database
-	var err error
-	if result.db, err = sql.Open("postgres", dataSourceName); err != nil {
+// Wrap returns a prepared Database object.
+func Wrap(db *sql.DB) (*Database, error) {
+	result := Database{db: db}
+
+	if err := result.JoinedHostsTable.Prepare(db); err != nil {
 		return nil, err
 	}
-	if err = result.prepare(); err != nil {
+	if err := result.RoomTable.Prepare(db); err != nil {
 		return nil, err
 	}
+	if err := result.PartitionOffsetStatements.Prepare(db, "federationsender"); err != nil {
+		return nil, err
+	}
+
 	return &result, nil
-}
-
-func (d *Database) prepare() error {
-	var err error
-
-	if err = d.joinedHostsStatements.prepare(d.db); err != nil {
-		return err
-	}
-
-	if err = d.roomStatements.prepare(d.db); err != nil {
-		return err
-	}
-
-	return d.PartitionOffsetStatements.Prepare(d.db, "federationsender")
 }
 
 // UpdateRoom updates the joined hosts for a room and returns what the joined
@@ -107,7 +81,7 @@ func (d *Database) UpdateRoom(
 		if err = d.deleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 			return err
 		}
-		return d.updateRoom(ctx, txn, roomID, newEventID)
+		return d.RoomTable.updateRoom(ctx, txn, roomID, newEventID)
 	})
 	return
 }

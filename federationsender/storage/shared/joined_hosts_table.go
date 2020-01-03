@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package postgres
+package shared
 
 import (
 	"context"
@@ -56,13 +56,13 @@ const selectJoinedHostsSQL = "" +
 	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
 	" WHERE room_id = $1"
 
-type joinedHostsStatements struct {
+type JoinedHostsTable struct {
 	insertJoinedHostsStmt *sql.Stmt
 	deleteJoinedHostsStmt *sql.Stmt
 	selectJoinedHostsStmt *sql.Stmt
 }
 
-func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
+func (s *JoinedHostsTable) Prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(joinedHostsSchema)
 	if err != nil {
 		return
@@ -79,7 +79,7 @@ func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *joinedHostsStatements) insertJoinedHosts(
+func (s *JoinedHostsTable) insertJoinedHosts(
 	ctx context.Context,
 	txn *sql.Tx,
 	roomID, eventID string,
@@ -90,7 +90,7 @@ func (s *joinedHostsStatements) insertJoinedHosts(
 	return err
 }
 
-func (s *joinedHostsStatements) deleteJoinedHosts(
+func (s *JoinedHostsTable) deleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
 	stmt := common.TxStmt(txn, s.deleteJoinedHostsStmt)
@@ -98,14 +98,14 @@ func (s *joinedHostsStatements) deleteJoinedHosts(
 	return err
 }
 
-func (s *joinedHostsStatements) selectJoinedHostsWithTx(
+func (s *JoinedHostsTable) selectJoinedHostsWithTx(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
 	stmt := common.TxStmt(txn, s.selectJoinedHostsStmt)
 	return joinedHostsFromStmt(ctx, stmt, roomID)
 }
 
-func (s *joinedHostsStatements) selectJoinedHosts(
+func (s *JoinedHostsTable) selectJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
 	return joinedHostsFromStmt(ctx, s.selectJoinedHostsStmt, roomID)
