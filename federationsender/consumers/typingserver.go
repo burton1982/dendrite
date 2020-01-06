@@ -29,7 +29,7 @@ import (
 // OutputTypingEventConsumer consumes events that originate in typing server.
 type OutputTypingEventConsumer struct {
 	consumer   *common.ContinualConsumer
-	db         storage.Database
+	db         *storage.Storage
 	queues     *queue.OutgoingQueues
 	ServerName gomatrixserverlib.ServerName
 }
@@ -39,7 +39,7 @@ func NewOutputTypingEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
-	store storage.Database,
+	store *storage.Storage,
 ) *OutputTypingEventConsumer {
 	consumer := common.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputTypingEvent),

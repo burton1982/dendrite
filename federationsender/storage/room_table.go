@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package shared
+package storage
 
 import (
 	"context"
@@ -22,45 +22,32 @@ import (
 	"github.com/matrix-org/dendrite/common"
 )
 
-const roomSchema = `
-CREATE TABLE IF NOT EXISTS federationsender_rooms (
-    -- The string ID of the room
-    room_id TEXT PRIMARY KEY,
-    -- The most recent event state by the room server.
-    -- We can use this to tell if our view of the room state has become
-    -- desynchronised.
-    last_event_id TEXT NOT NULL
-);`
-
-const insertRoomSQL = "" +
-	"INSERT INTO federationsender_rooms (room_id, last_event_id) VALUES ($1, '')" +
-	" ON CONFLICT DO NOTHING"
-
-const selectRoomForUpdateSQL = "" +
-	"SELECT last_event_id FROM federationsender_rooms WHERE room_id = $1 FOR UPDATE"
-
-const updateRoomSQL = "" +
-	"UPDATE federationsender_rooms SET last_event_id = $2 WHERE room_id = $1"
-
 type RoomTable struct {
 	insertRoomStmt          *sql.Stmt
 	selectRoomForUpdateStmt *sql.Stmt
 	updateRoomStmt          *sql.Stmt
 }
 
-func (s *RoomTable) Prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(roomSchema)
+type RoomSchema interface {
+	Schema() string
+	InsertRoomStmt(*sql.DB) (*sql.Stmt, error)
+	SelectRoomForUpdateStmt(*sql.DB) (*sql.Stmt, error)
+	UpdateRoomStmt(*sql.DB) (*sql.Stmt, error)
+}
+
+func (s *RoomTable) prepareRoomTable(db *sql.DB, schema RoomSchema) (err error) {
+	_, err = db.Exec(schema.Schema())
 	if err != nil {
 		return
 	}
 
-	if s.insertRoomStmt, err = db.Prepare(insertRoomSQL); err != nil {
+	if s.insertRoomStmt, err = schema.InsertRoomStmt(db); err != nil {
 		return
 	}
-	if s.selectRoomForUpdateStmt, err = db.Prepare(selectRoomForUpdateSQL); err != nil {
+	if s.selectRoomForUpdateStmt, err = schema.SelectRoomForUpdateStmt(db); err != nil {
 		return
 	}
-	if s.updateRoomStmt, err = db.Prepare(updateRoomSQL); err != nil {
+	if s.updateRoomStmt, err = schema.UpdateRoomStmt(db); err != nil {
 		return
 	}
 	return

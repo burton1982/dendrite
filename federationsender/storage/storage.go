@@ -16,13 +16,15 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
-	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 	"github.com/matrix-org/dendrite/federationsender/types"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Database interface {
@@ -31,26 +33,48 @@ type Database interface {
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 }
 
+type Storage struct {
+	db *sql.DB
+	common.PartitionStorer
+	RoomTable
+	JoinedHostsTable
+}
+
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (Database, error) {
+func NewDatabase(dataSourceName string) (*Storage, error) {
+	result := &Storage{}
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, err
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.NewDatabase(dataSourceName)
+		if result.db, err = sql.Open("postgres", dataSourceName); err != nil {
+			return nil, err
+		}
 
 	case "file":
 		if uri.Opaque != "" { // file:filename.db
-			return sqlite3.NewDatabase(uri.Opaque)
+			if result.db, err = sql.Open("sqlite3", uri.Opaque); err != nil {
+				return nil, err
+			}
 		}
 		if uri.Path != "" { // file:///path/to/filename.db
-			return sqlite3.NewDatabase(uri.Path)
+			if result.db, err = sql.Open("sqlite3", uri.Path); err != nil {
+				return nil, err
+			}
 		}
-		return nil, errors.New("unknown sqlite3 path")
 
 	default:
 		return nil, errors.New("unknown schema")
 	}
+
+	if err = result.prepareRoomTable(result.db, &postgres.PostgresRoomTable{}); err != nil {
+		return nil, err
+	}
+	if err = result.prepareJoinedHostsTable(result.db, &postgres.PostgresJoinedHostsTable{}); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

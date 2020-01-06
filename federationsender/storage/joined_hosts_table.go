@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package shared
+package storage
 
 import (
 	"context"
@@ -25,55 +25,31 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const joinedHostsSchema = `
--- The joined_hosts table stores a list of m.room.member event ids in the
--- current state for each room where the membership is "join".
--- There will be an entry for every user that is joined to the room.
-CREATE TABLE IF NOT EXISTS federationsender_joined_hosts (
-    -- The string ID of the room.
-    room_id TEXT NOT NULL,
-    -- The event ID of the m.room.member join event.
-    event_id TEXT NOT NULL,
-    -- The domain part of the user ID the m.room.member event is for.
-    server_name TEXT NOT NULL
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
-    ON federationsender_joined_hosts (event_id);
-
-CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
-    ON federationsender_joined_hosts (room_id)
-`
-
-const insertJoinedHostsSQL = "" +
-	"INSERT INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
-	" VALUES ($1, $2, $3)"
-
-const deleteJoinedHostsSQL = "" +
-	"DELETE FROM federationsender_joined_hosts WHERE event_id = ANY($1)"
-
-const selectJoinedHostsSQL = "" +
-	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
-	" WHERE room_id = $1"
-
 type JoinedHostsTable struct {
 	insertJoinedHostsStmt *sql.Stmt
 	deleteJoinedHostsStmt *sql.Stmt
 	selectJoinedHostsStmt *sql.Stmt
 }
 
-func (s *JoinedHostsTable) Prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(joinedHostsSchema)
+type JoinedHostsSchema interface {
+	Schema() string
+	InsertJoinedHostsStmt(*sql.DB) (*sql.Stmt, error)
+	DeleteJoinedHostsStmt(*sql.DB) (*sql.Stmt, error)
+	SelectJoinedHostsStmt(*sql.DB) (*sql.Stmt, error)
+}
+
+func (s *JoinedHostsTable) prepareJoinedHostsTable(db *sql.DB, schema JoinedHostsSchema) (err error) {
+	_, err = db.Exec(schema.Schema())
 	if err != nil {
 		return
 	}
-	if s.insertJoinedHostsStmt, err = db.Prepare(insertJoinedHostsSQL); err != nil {
+	if s.insertJoinedHostsStmt, err = schema.InsertJoinedHostsStmt(db); err != nil {
 		return
 	}
-	if s.deleteJoinedHostsStmt, err = db.Prepare(deleteJoinedHostsSQL); err != nil {
+	if s.deleteJoinedHostsStmt, err = schema.DeleteJoinedHostsStmt(db); err != nil {
 		return
 	}
-	if s.selectJoinedHostsStmt, err = db.Prepare(selectJoinedHostsSQL); err != nil {
+	if s.selectJoinedHostsStmt, err = schema.SelectJoinedHostsStmt(db); err != nil {
 		return
 	}
 	return

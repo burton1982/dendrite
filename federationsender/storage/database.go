@@ -1,4 +1,4 @@
-package shared
+package storage
 
 import (
 	"context"
@@ -8,36 +8,12 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/types"
 )
 
-type Database struct {
-	JoinedHostsTable
-	RoomTable
-	common.PartitionOffsetStatements
-	db *sql.DB
-}
-
-// Wrap returns a prepared Database object.
-func Wrap(db *sql.DB) (*Database, error) {
-	result := Database{db: db}
-
-	if err := result.JoinedHostsTable.Prepare(db); err != nil {
-		return nil, err
-	}
-	if err := result.RoomTable.Prepare(db); err != nil {
-		return nil, err
-	}
-	if err := result.PartitionOffsetStatements.Prepare(db, "federationsender"); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
 // UpdateRoom updates the joined hosts for a room and returns what the joined
 // hosts were before the update, or nil if this was a duplicate message.
 // This is called when we receive a message from kafka, so we pass in
 // oldEventID and newEventID to check that we haven't missed any messages or
 // this isn't a duplicate message.
-func (d *Database) UpdateRoom(
+func (d *Storage) UpdateRoom(
 	ctx context.Context,
 	roomID, oldEventID, newEventID string,
 	addHosts []types.JoinedHost,
@@ -81,7 +57,7 @@ func (d *Database) UpdateRoom(
 		if err = d.deleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 			return err
 		}
-		return d.RoomTable.updateRoom(ctx, txn, roomID, newEventID)
+		return d.updateRoom(ctx, txn, roomID, newEventID)
 	})
 	return
 }
@@ -89,7 +65,7 @@ func (d *Database) UpdateRoom(
 // GetJoinedHosts returns the currently joined hosts for room,
 // as known to federationserver.
 // Returns an error if something goes wrong.
-func (d *Database) GetJoinedHosts(
+func (d *Storage) GetJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
 	return d.selectJoinedHosts(ctx, roomID)
