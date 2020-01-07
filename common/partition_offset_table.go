@@ -38,7 +38,8 @@ const selectPartitionOffsetsSQL = "" +
 
 const upsertPartitionOffsetsSQL = "" +
 	"INSERT INTO ${prefix}_partition_offsets (topic, partition, partition_offset) VALUES ($1, $2, $3)" +
-	" ON CONFLICT ON CONSTRAINT ${prefix}_topic_partition_unique" +
+	//	" ON CONFLICT ON CONSTRAINT ${prefix}_topic_partition_unique" +
+	" ON CONFLICT (topic, partition)" +
 	" DO UPDATE SET partition_offset = $3"
 
 // PartitionOffsetStatements represents a set of statements that can be run on a partition_offsets table.

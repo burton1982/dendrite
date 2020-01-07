@@ -22,38 +22,34 @@ import (
 type PostgresRoomTable struct {
 }
 
-const roomSchema = `
-CREATE TABLE IF NOT EXISTS federationsender_rooms (
-    -- The string ID of the room
-    room_id TEXT PRIMARY KEY,
-    -- The most recent event state by the room server.
-    -- We can use this to tell if our view of the room state has become
-    -- desynchronised.
-    last_event_id TEXT NOT NULL
-);`
-
 func (t *PostgresRoomTable) Schema() string {
-	return roomSchema
+	return `
+	CREATE TABLE IF NOT EXISTS federationsender_rooms (
+	    -- The string ID of the room
+	    room_id TEXT PRIMARY KEY,
+	    -- The most recent event state by the room server.
+	    -- We can use this to tell if our view of the room state has become
+	    -- desynchronised.
+	    last_event_id TEXT NOT NULL
+	);
+	`
 }
-
-const insertRoomSQL = "" +
-	"INSERT INTO federationsender_rooms (room_id, last_event_id) VALUES ($1, '')" +
-	" ON CONFLICT DO NOTHING"
 
 func (t *PostgresRoomTable) InsertRoomStmt(db *sql.DB) (*sql.Stmt, error) {
-	return db.Prepare(insertRoomSQL)
+	return db.Prepare(`
+		INSERT INTO federationsender_rooms (room_id, last_event_id) VALUES ($1, '')
+		  ON CONFLICT DO NOTHING
+	`)
 }
-
-const selectRoomForUpdateSQL = "" +
-	"SELECT last_event_id FROM federationsender_rooms WHERE room_id = $1 FOR UPDATE"
 
 func (t *PostgresRoomTable) SelectRoomForUpdateStmt(db *sql.DB) (*sql.Stmt, error) {
-	return db.Prepare(selectRoomForUpdateSQL)
+	return db.Prepare(`
+		SELECT last_event_id FROM federationsender_rooms WHERE room_id = $1 FOR UPDATE
+	`)
 }
 
-const updateRoomSQL = "" +
-	"UPDATE federationsender_rooms SET last_event_id = $2 WHERE room_id = $1"
-
 func (t *PostgresRoomTable) UpdateRoomStmt(db *sql.DB) (*sql.Stmt, error) {
-	return db.Prepare(updateRoomSQL)
+	return db.Prepare(`
+		UPDATE federationsender_rooms SET last_event_id = $2 WHERE room_id = $1
+	`)
 }

@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -70,8 +69,12 @@ func (s *JoinedHostsTable) deleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
 	stmt := common.TxStmt(txn, s.deleteJoinedHostsStmt)
-	_, err := stmt.ExecContext(ctx, pq.StringArray(eventIDs))
-	return err
+	for _, eventID := range eventIDs {
+		if _, err := stmt.ExecContext(ctx, eventID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *JoinedHostsTable) selectJoinedHostsWithTx(

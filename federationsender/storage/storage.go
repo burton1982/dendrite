@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
+	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
 	"github.com/matrix-org/dendrite/federationsender/types"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -35,7 +36,7 @@ type Database interface {
 
 type Storage struct {
 	db *sql.DB
-	common.PartitionStorer
+	common.PartitionOffsetStatements
 	RoomTable
 	JoinedHostsTable
 }
@@ -52,6 +53,12 @@ func NewDatabase(dataSourceName string) (*Storage, error) {
 		if result.db, err = sql.Open("postgres", dataSourceName); err != nil {
 			return nil, err
 		}
+		if err = result.prepareRoomTable(result.db, &postgres.PostgresRoomTable{}); err != nil {
+			return nil, err
+		}
+		if err = result.prepareJoinedHostsTable(result.db, &postgres.PostgresJoinedHostsTable{}); err != nil {
+			return nil, err
+		}
 
 	case "file":
 		if uri.Opaque != "" { // file:filename.db
@@ -64,15 +71,20 @@ func NewDatabase(dataSourceName string) (*Storage, error) {
 				return nil, err
 			}
 		}
+		if result.db != nil {
+			if err = result.prepareRoomTable(result.db, &sqlite3.SqliteRoomTable{}); err != nil {
+				return nil, err
+			}
+			if err = result.prepareJoinedHostsTable(result.db, &sqlite3.SqliteJoinedHostsTable{}); err != nil {
+				return nil, err
+			}
+		}
 
 	default:
 		return nil, errors.New("unknown schema")
 	}
 
-	if err = result.prepareRoomTable(result.db, &postgres.PostgresRoomTable{}); err != nil {
-		return nil, err
-	}
-	if err = result.prepareJoinedHostsTable(result.db, &postgres.PostgresJoinedHostsTable{}); err != nil {
+	if err := result.PartitionOffsetStatements.Prepare(result.db, "federationsender"); err != nil {
 		return nil, err
 	}
 

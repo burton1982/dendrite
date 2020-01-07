@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -183,15 +184,42 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 // should use naffka.
 func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 	if cfg.Kafka.UseNaffka {
-		db, err := sql.Open("postgres", string(cfg.Database.Naffka))
+
+		///////////
+		var db *sql.DB
+		var naffkaDB naffka.Database
+
+		uri, err := url.Parse(string(cfg.Database.Naffka))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}
-
-		naffkaDB, err := naffka.NewPostgresqlDatabase(db)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to setup naffka database")
+		switch uri.Scheme {
+		case "postgres":
+			db, err = sql.Open("postgres", string(cfg.Database.Naffka))
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to open naffka database")
+			}
+			naffkaDB, err = naffka.NewPostgresqlDatabase(db)
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to setup naffka database")
+			}
+		case "file":
+			if uri.Opaque != "" { // file:filename.db
+				if db, err = sql.Open("sqlite3", uri.Opaque); err != nil {
+					logrus.WithError(err).Panic("Failed to open naffka database")
+				}
+			}
+			if uri.Path != "" { // file:///path/to/filename.db
+				if db, err = sql.Open("sqlite3", uri.Path); err != nil {
+					logrus.WithError(err).Panic("Failed to open naffka database")
+				}
+			}
+			naffkaDB, err = naffka.NewSqliteDatabase(db)
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to setup naffka database")
+			}
 		}
+		///////////
 
 		naff, err := naffka.New(naffkaDB)
 		if err != nil {

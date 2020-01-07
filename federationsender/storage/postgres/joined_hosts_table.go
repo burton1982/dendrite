@@ -22,49 +22,44 @@ import (
 type PostgresJoinedHostsTable struct {
 }
 
-const joinedHostsSchema = `
--- The joined_hosts table stores a list of m.room.member event ids in the
--- current state for each room where the membership is "join".
--- There will be an entry for every user that is joined to the room.
-CREATE TABLE IF NOT EXISTS federationsender_joined_hosts (
-    -- The string ID of the room.
-    room_id TEXT NOT NULL,
-    -- The event ID of the m.room.member join event.
-    event_id TEXT NOT NULL,
-    -- The domain part of the user ID the m.room.member event is for.
-    server_name TEXT NOT NULL
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
-    ON federationsender_joined_hosts (event_id);
-
-CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
-    ON federationsender_joined_hosts (room_id)
-`
-
 func (t *PostgresJoinedHostsTable) Schema() string {
-	return joinedHostsSchema
-}
+	return `
+	-- The joined_hosts table stores a list of m.room.member event ids in the
+	-- current state for each room where the membership is "join".
+	-- There will be an entry for every user that is joined to the room.
+	CREATE TABLE IF NOT EXISTS federationsender_joined_hosts (
+	    -- The string ID of the room.
+	    room_id TEXT NOT NULL,
+	    -- The event ID of the m.room.member join event.
+	    event_id TEXT NOT NULL,
+	    -- The domain part of the user ID the m.room.member event is for.
+	    server_name TEXT NOT NULL
+	);
 
-const insertJoinedHostsSQL = "" +
-	"INSERT INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
-	" VALUES ($1, $2, $3)"
+	CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
+	    ON federationsender_joined_hosts (event_id);
+
+	CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
+	    ON federationsender_joined_hosts (room_id)
+	`
+}
 
 func (t *PostgresJoinedHostsTable) InsertJoinedHostsStmt(db *sql.DB) (*sql.Stmt, error) {
-	return db.Prepare(insertJoinedHostsSQL)
+	return db.Prepare(`
+		INSERT INTO federationsender_joined_hosts (room_id, event_id, server_name)
+		  VALUES ($1, $2, $3)
+	`)
 }
-
-const deleteJoinedHostsSQL = "" +
-	"DELETE FROM federationsender_joined_hosts WHERE event_id = ANY($1)"
 
 func (t *PostgresJoinedHostsTable) DeleteJoinedHostsStmt(db *sql.DB) (*sql.Stmt, error) {
-	return db.Prepare(deleteJoinedHostsSQL)
+	return db.Prepare(`
+		DELETE FROM federationsender_joined_hosts WHERE event_id = $1
+	`)
 }
 
-const selectJoinedHostsSQL = "" +
-	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
-	" WHERE room_id = $1"
-
 func (t *PostgresJoinedHostsTable) SelectJoinedHostsStmt(db *sql.DB) (*sql.Stmt, error) {
-	return db.Prepare(selectJoinedHostsSQL)
+	return db.Prepare(`
+		SELECT event_id, server_name FROM federationsender_joined_hosts
+		  WHERE room_id = $1
+	`)
 }

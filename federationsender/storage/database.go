@@ -37,7 +37,7 @@ func (d *Storage) UpdateRoom(
 			return nil
 		}
 
-		if lastSentEventID != oldEventID {
+		if lastSentEventID != "" && lastSentEventID != oldEventID {
 			return types.EventIDMismatchError{
 				DatabaseID: lastSentEventID, RoomServerID: oldEventID,
 			}
