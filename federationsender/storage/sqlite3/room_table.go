@@ -37,7 +37,7 @@ func (t *SqliteRoomTable) Schema() string {
 
 func (t *SqliteRoomTable) InsertRoomStmt(db *sql.DB) (*sql.Stmt, error) {
 	return db.Prepare(`
-		INSERT INTO federationsender_rooms (room_id, last_event_id) VALUES ($1, '')"
+		INSERT INTO federationsender_rooms (room_id, last_event_id) VALUES ($1, '')
 	  ON CONFLICT DO NOTHING
 	`)
 }
