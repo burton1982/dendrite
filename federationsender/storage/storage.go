@@ -17,7 +17,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"net/url"
 
 	"github.com/matrix-org/dendrite/common"
@@ -46,7 +45,7 @@ func NewDatabase(dataSourceName string) (*Storage, error) {
 	result := &Storage{}
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return nil, err
+		return postgres.NewDatabase(dataSourceName)
 	}
 	switch uri.Scheme {
 	case "postgres":
@@ -81,7 +80,7 @@ func NewDatabase(dataSourceName string) (*Storage, error) {
 		}
 
 	default:
-		return nil, errors.New("unknown schema")
+		return postgres.NewDatabase(dataSourceName)
 	}
 
 	if err := result.PartitionOffsetStatements.Prepare(result.db, "federationsender"); err != nil {
